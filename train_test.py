@@ -1,3 +1,5 @@
+from comet_ml import Experiment
+
 import os
 import argparse
 import json
@@ -13,7 +15,34 @@ from data import ScanDataset,MTDataset,SCAN_collate
 from SyntacticAttention import *
 from utils import *
 
+comet_args = {
+    'project_name': os.environ.get('COMET_PROJECT_NAME'),
+    'workspace': 'andresespinosapc',
+}
+if os.environ.get('COMET_DISABLE'):
+    comet_args['disabled'] = True
+    comet_args['api_key'] = ''
+if os.environ.get('COMET_OFFLINE'):
+    comet_args['api_key'] = ''
+    comet_args['offline_directory'] = 'comet_offline'
+    experiment = OfflineExperiment(**comet_args)
+else:
+    experiment = Experiment(**comet_args)
+
+def log_comet_parameters(opt):
+    opt_dict = vars(opt)
+    for key in opt_dict.keys():
+        experiment.log_parameter(key, opt_dict[key])
+
+def validate_args(parser, args):
+    if args.exp_name is None and not comet_args.get('disabled'):
+        parser.error('Please provide exp_name if logging to CometML')    
+
+
 parser = argparse.ArgumentParser()
+
+parser.add_argument('--exp_name', type=str, default=None, help='Experiment name for CometML logging')
+
 # Data
 parser.add_argument('--dataset', choices=['SCAN','MT'],
                     default='SCAN',
@@ -69,7 +98,7 @@ parser.add_argument('--results_dir', default='results',
                     help='Results subdirectory to save results')
 parser.add_argument('--out_data_file', default='results.json',
                     help='Name of output data file')
-parser.add_argument('--checkpoint_path',default=None,
+parser.add_argument('--checkpoint_dir',default=None,
                     help='Path to output saved weights.')
 parser.add_argument('--checkpoint_every', type=int, default=5,
                     help='Epochs before evaluating model and saving weights')
@@ -175,7 +204,7 @@ def main(args):
             test_errors.append(test_error)
 
             # Write stats file
-            results_path = '../results/%s' % (args.results_dir)
+            results_path = os.path.join(args.results_dir, experiment.get_key())
             if not os.path.isdir(results_path):
                 os.mkdir(results_path)
             stats = {'loss_data':loss_data,
@@ -186,12 +215,22 @@ def main(args):
             with open(results_file_name, 'w') as f:
                 json.dump(stats, f)
 
+            # Log metrics to comet
+            metrics = {
+                'epoch': epoch_count,
+                'train_seq_acc': 1.0 - train_error,
+                'val_seq_acc': 1.0 - val_error,
+                'test_seq_acc': 1.0 - test_error
+            }
+            experiment.log_metrics(metrics)
+
             # Save model weights
             if val_error < best_val_error: # use val (not test) to decide to save
                 best_val_error = val_error
-                if args.checkpoint_path is not None:
+                if args.checkpoint_dir is not None:
+                    checkpoint_path = os.path.join(args.checkpoint_dir, experiment.get_key())
                     torch.save(model.state_dict(),
-                               args.checkpoint_path)
+                               checkpoint_path)
 
 
 def check_accuracy(dataloader, model, device, args):
@@ -219,5 +258,10 @@ def check_accuracy(dataloader, model, device, args):
 
 if __name__ == '__main__':
     args = parser.parse_args()
+    validate_args(parser, args)
+
+    experiment.set_name(args.exp_name)
+    log_comet_parameters(args)
+
     print(args)
     main(args)
