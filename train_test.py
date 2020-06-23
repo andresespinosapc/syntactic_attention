@@ -11,7 +11,7 @@ from torch.nn.utils import clip_grad_norm_
 import torch.optim as optim
 
 from torch.utils.data import DataLoader
-from data import ScanDataset,MTDataset,SCAN_collate
+from data import ScanDataset,ScanAugmentedDataset,MTDataset,SCAN_collate
 from SyntacticAttention import *
 from utils import *
 
@@ -42,6 +42,7 @@ def validate_args(parser, args):
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--exp_name', type=str, default=None, help='Experiment name for CometML logging')
+parser.add_argument('--use_scan_augmented', type=str2bool, default=False, help='Use ScanAugmentedDataset')
 
 # Data
 parser.add_argument('--dataset', choices=['SCAN','MT'],
@@ -118,7 +119,10 @@ def main(args):
 
     # Datasets
     if args.dataset == 'SCAN':
-        all_train_data = ScanDataset(args.train_data_file,vocab)
+        if args.use_scan_augmented:
+            all_train_data = ScanAugmentedDataset(args.train_data_file,vocab)
+        else:
+            all_train_data = ScanDataset(args.train_data_file,vocab)
         split_id = int(0.8*len(all_train_data))
         train_data = [all_train_data[i] for i in range(split_id)]
         val_data = [all_train_data[i] for i in range(split_id,len(all_train_data))]

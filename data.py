@@ -1,3 +1,5 @@
+import random
+
 import torch
 from torch.utils.data import Dataset
 
@@ -76,6 +78,28 @@ class ScanDataset(Dataset):
 
     def __len__(self):
         return len(self.text_instructions)
+
+class ScanAugmentedDataset(ScanDataset):
+    def __getitem__(self, index):
+        # Generate instruction tensor
+        in_vocab_size = len(self.vocab['in_token_to_idx'])
+        current_text_instruction = self.text_instructions[index]
+        random_text_instruction = self.text_instructions[random.randint(0, self.__len__() - 1)]
+        text_instruction = current_text_instruction + random_text_instruction[1:-1]
+        instruction = []
+        for i,token in enumerate(text_instruction):
+            idx = int(self.vocab['in_token_to_idx'][token])
+            idx = torch.tensor(idx)
+            instruction.append(idx)
+        # Generate action tensor
+        out_vocab_size = len(self.vocab['out_token_to_idx'])
+        text_action = self.text_actions[index]
+        action = []
+        for i,token in enumerate(text_action):
+            idx = int(self.vocab['out_token_to_idx'][token])
+            idx = torch.tensor(idx)
+            action.append(idx)
+        return (instruction, action, text_instruction, text_action)
 
 class MTDataset(Dataset):
     def __init__(self, file, vocab=None, flip=False):
