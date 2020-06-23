@@ -75,8 +75,10 @@ parser.add_argument('--m_hidden_dim', type=int, default=120,
                     help='Number of hidden units in semantic embeddings')
 parser.add_argument('--x_hidden_dim', type=int, default=200,
                     help='Number of hidden units in syntax rnn')
-parser.add_argument('--n_layers', type=int, default=1,
-                    help='Number of layers in RNNs')
+parser.add_argument('--enc_n_layers', type=int, default=2,
+                    help='Number of layers in encoder RNN')
+parser.add_argument('--dec_n_layers', type=int, default=1,
+                    help='Number of layers in decoder RNN')
 parser.add_argument('--dropout_p', type=float, default=0.5,
                     help='Dropout rate')
 parser.add_argument('--seq_sem', type=str2bool, default=False,
@@ -145,7 +147,7 @@ def main(args):
     out_vocab_size = len(vocab['out_idx_to_token'])
     # Model
     model = Seq2SeqSynAttn(in_vocab_size, args.m_hidden_dim, args.x_hidden_dim,
-                           out_vocab_size, args.rnn_type, args.n_layers,
+                           out_vocab_size, args.rnn_type, args.enc_n_layers, args.dec_n_layers,
                            args.dropout_p, args.seq_sem, args.syn_act,
                            args.sem_mlp, None, device)
 

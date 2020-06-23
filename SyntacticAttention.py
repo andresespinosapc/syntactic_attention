@@ -193,15 +193,16 @@ class SynAttnDecoder(nn.Module):
 
 class Seq2SeqSynAttn(nn.Module):
     def __init__(self, in_vocab_size, m_hidden_size, x_hidden_size,
-                 out_vocab_size, rnn_type, num_layers, dropout_p,
-                 seq_sem, syn_act, sem_mlp, max_len, device):
+                 out_vocab_size, rnn_type, enc_num_layers, dec_num_layers,
+                 dropout_p, seq_sem, syn_act, sem_mlp, max_len, device):
         super(Seq2SeqSynAttn, self).__init__()
         self.in_vocab_size = in_vocab_size # number of commands
         self.m_hidden_size = m_hidden_size # semantic hidden size
         self.x_hidden_size = x_hidden_size # syntax hidden size
         self.out_vocab_size = out_vocab_size # number of actions
         self.rnn_type = rnn_type # (GRU or LSTM)
-        self.num_layers = num_layers # number of layers in RNNs
+        self.enc_num_layers = enc_num_layers # number of layers in encoder RNN
+        self.dec_num_layers = dec_num_layers # number of layers in decoder RNN
         self.dropout_p = dropout_p # dropout rate
         self.seq_sem = seq_sem # Sequential semantics option
         self.syn_act = syn_act # Syntax-Action option
@@ -210,10 +211,10 @@ class Seq2SeqSynAttn(nn.Module):
         self.device = device
 
         self.encoder = SynAttnEncoder(in_vocab_size, m_hidden_size,
-                                      x_hidden_size, rnn_type, num_layers,
+                                      x_hidden_size, rnn_type, enc_num_layers,
                                       dropout_p, seq_sem, device)
         self.decoder = SynAttnDecoder(m_hidden_size, x_hidden_size,
-                                      out_vocab_size, rnn_type, num_layers,
+                                      out_vocab_size, rnn_type, dec_num_layers,
                                       dropout_p, syn_act, sem_mlp, device)
 
     def forward(self, instructions, true_actions):
