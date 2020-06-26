@@ -13,6 +13,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from data import ScanDataset,ScanAugmentedDataset,MTDataset,SCAN_collate
 from SyntacticAttention import *
+from SymbolicOperator import SymbolicOperator
 from utils import *
 
 comet_args = {
@@ -36,13 +37,14 @@ def log_comet_parameters(opt):
 
 def validate_args(parser, args):
     if args.exp_name is None and not comet_args.get('disabled'):
-        parser.error('Please provide exp_name if logging to CometML')    
+        parser.error('Please provide exp_name if logging to CometML')
 
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--exp_name', type=str, default=None, help='Experiment name for CometML logging')
 parser.add_argument('--use_scan_augmented', type=str2bool, default=False, help='Use ScanAugmentedDataset')
+parser.add_argument('--model', type=str, choices=['syntactic_attention', 'symbolic_operator'], default='syntactic_attention')
 
 # Data
 parser.add_argument('--dataset', choices=['SCAN','MT'],
@@ -146,10 +148,15 @@ def main(args):
     in_vocab_size = len(vocab['in_token_to_idx'])
     out_vocab_size = len(vocab['out_idx_to_token'])
     # Model
-    model = Seq2SeqSynAttn(in_vocab_size, args.m_hidden_dim, args.x_hidden_dim,
-                           out_vocab_size, args.rnn_type, args.enc_n_layers, args.dec_n_layers,
-                           args.dropout_p, args.seq_sem, args.syn_act,
-                           args.sem_mlp, None, device)
+    if args.model == 'syntactic_attention':
+        model = Seq2SeqSynAttn(in_vocab_size, args.m_hidden_dim, args.x_hidden_dim,
+                            out_vocab_size, args.rnn_type, args.enc_n_layers, args.dec_n_layers,
+                            args.dropout_p, args.seq_sem, args.syn_act,
+                            args.sem_mlp, None, device)
+    elif args.model == 'symbolic_operator':
+        model = SymbolicOperator(in_vocab_size, out_vocab_size)
+    else:
+        raise ValueError('Invalid model name %s' % (args.model))
 
     if args.load_weights_from is not None:
         model.load_state_dict(torch.load(args.load_weights_from))
