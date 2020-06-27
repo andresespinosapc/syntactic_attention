@@ -1,0 +1,17 @@
+IN: walk OUT: I_WALK
+IN: jump OUT: I_JUMP
+IN: look OUT: I_LOOK
+IN: run OUT: I_RUN
+IN: jump twice OUT: I_JUMP I_JUMP
+IN: walk twice OUT: I_WALK I_WALK
+IN: look twice OUT: I_LOOK I_LOOK
+IN: jump thrice OUT: I_JUMP I_JUMP I_JUMP
+IN: walk thrice OUT: I_WALK I_WALK I_WALK
+IN: look thrice OUT: I_LOOK I_LOOK I_LOOK
+IN: run thrice OUT: I_RUN I_RUN I_RUN
+IN: jump twice and run OUT: I_JUMP I_JUMP I_RUN
+IN: walk twice and run OUT: I_WALK I_WALK I_RUN
+IN: look twice and run OUT: I_LOOK I_LOOK I_RUN
+IN: jump twice and walk twice OUT: I_JUMP I_JUMP I_WALK I_WALK
+IN: walk twice and look twice OUT: I_WALK I_WALK I_LOOK I_LOOK
+IN: look twice and walk thrice OUT: I_LOOK I_LOOK I_WALK I_WALK I_WALK

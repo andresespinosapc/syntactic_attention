@@ -20,24 +20,29 @@ class SymbolicOperator(nn.Module):
         self.program_dim = 200
         self.n_pointers = 3
 
-        self.scratch_keys = PositionalEncoding(self.scratch_keys_dim, max_len=self.max_len).pe[:, 0, :]
+        scratch_keys = PositionalEncoding(self.scratch_keys_dim, max_len=self.max_len).pe[:, 0, :]
+        self.register_buffer('scratch_keys', scratch_keys)
         self.initial_scratch_value = nn.Parameter(torch.randn(self.actions_dim))
         self.attention = Attention()
+        self.gate_embedding = nn.Embedding(self.in_vocab_size, 1)
         self.program_embedding = nn.Embedding(self.in_vocab_size, self.program_dim)
         self.primitive_embedding = nn.Embedding(self.in_vocab_size, self.actions_dim)
 
         self.gate_linear = nn.Linear(self.scratch_keys_dim, 1)
-        self.executor_rnn_cell = nn.GRUCell(input_size=1, hidden_size=self.scratch_keys_dim * (self.n_pointers + 1))
+        self.executor_rnn_cell = nn.GRUCell(input_size=1, hidden_size=self.scratch_keys_dim * self.n_pointers)
         self.out_linear = nn.Linear(self.actions_dim, self.out_vocab_size)
+
+        self.scratch_history = []
 
     @property
     def device(self):
         return next(self.parameters()).device
 
     def init_executor_hidden(self, batch_size):
-        return self.scratch_keys[0].repeat(batch_size, self.n_pointers + 1)
+        return self.scratch_keys[0].repeat(batch_size, self.n_pointers)
 
     def forward(self, instructions, true_actions):
+        self.scratch_history = []
         batch_size = len(instructions)
 
         # Pad sequences of true actions
@@ -47,6 +52,8 @@ class SymbolicOperator(nn.Module):
         # Pad sequences in instructions
         seq_lens = [ins.shape[0] for ins in instructions]
         instructions = pad_sequence(instructions)
+        # Remove <SOS> and <EOS> tokens from instructions
+        instructions = instructions[1:-1, :]
 
         # Remove <SOS> token from true actions
         padded_true_actions = padded_true_actions[1:, :]
@@ -58,13 +65,15 @@ class SymbolicOperator(nn.Module):
         scratch_values = self.initial_scratch_value.repeat(batch_size, max_len, 1)
 
         for word_idx in instructions:
+            if not self.training:
+                self.scratch_history.append([])
+            gate = torch.sigmoid(self.gate_embedding(word_idx))
             program = self.program_embedding(word_idx)
             primitive = self.primitive_embedding(word_idx)
             for step in range(max_program_steps):
                 init_pointer = executor_hidden[:, 0:self.scratch_keys_dim]
                 read_pointer = executor_hidden[:, self.scratch_keys_dim:2*self.scratch_keys_dim]
                 write_pointer = executor_hidden[:, 2*self.scratch_keys_dim:3*self.scratch_keys_dim]
-                gate = torch.sigmoid(self.gate_linear(executor_hidden[:, 3*self.scratch_keys_dim:4*self.scratch_keys_dim]))
 
                 read_value, read_attn = self.attention(read_pointer.unsqueeze(1), scratch_keys, scratch_values)
                 new_value = gate * primitive + (1 - gate) * read_value.squeeze(1)
@@ -78,6 +87,14 @@ class SymbolicOperator(nn.Module):
                 scratch_values = (new_value_weighted + previous_values_weighted).view(batch_size, max_len, -1)
 
                 executor_hidden = self.executor_rnn_cell(torch.zeros(batch_size, 1).to(self.device), executor_hidden)
+
+                if not self.training:
+                    self.scratch_history[-1].append([
+                        torch.round(gate),
+                        torch.round(read_attn),
+                        torch.round(write_mask),
+                        self.out_linear(scratch_values).cpu().detach()
+                    ])
 
         actions = F.log_softmax(self.out_linear(scratch_values), dim=-1)
 
