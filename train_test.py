@@ -45,6 +45,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--exp_name', type=str, default=None, help='Experiment name for CometML logging')
 parser.add_argument('--use_scan_augmented', type=str2bool, default=False, help='Use ScanAugmentedDataset')
 parser.add_argument('--model', type=str, choices=['syntactic_attention', 'symbolic_operator'], default='syntactic_attention')
+parser.add_argument('--auto_val_split', type=str2bool, default=True)
 
 # Data
 parser.add_argument('--dataset', choices=['SCAN','MT'],
@@ -127,9 +128,13 @@ def main(args):
             all_train_data = ScanAugmentedDataset(args.train_data_file,vocab)
         else:
             all_train_data = ScanDataset(args.train_data_file,vocab)
-        split_id = int(0.8*len(all_train_data))
-        train_data = [all_train_data[i] for i in range(split_id)]
-        val_data = [all_train_data[i] for i in range(split_id,len(all_train_data))]
+        if args.auto_val_split:
+            split_id = int(0.8*len(all_train_data))
+            train_data = [all_train_data[i] for i in range(split_id)]
+            val_data = [all_train_data[i] for i in range(split_id,len(all_train_data))]
+        else:
+            train_data = all_train_data
+            val_data = ScanDataset(args.val_data_file,vocab)
         test_data = ScanDataset(args.test_data_file,vocab)
     elif args.dataset == 'MT':
         train_data = MTDataset(args.train_data_file,vocab,args.flip)
