@@ -1,0 +1,3 @@
+IN: run twice OUT: I_RUN I_RUN
+IN: walk twice thrice OUT: I_WALK I_WALK I_WALK I_WALK I_WALK I_WALK
+IN: walk and run twice OUT: I_WALK I_RUN I_RUN
