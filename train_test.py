@@ -45,6 +45,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--exp_name', type=str, default=None, help='Experiment name for CometML logging')
 parser.add_argument('--use_scan_augmented', type=str2bool, default=False, help='Use ScanAugmentedDataset')
 parser.add_argument('--model', type=str, choices=['syntactic_attention', 'symbolic_operator'], default='syntactic_attention')
+parser.add_argument('--save_all_checkpoints', type=str2bool, default=False)
 
 # Data
 parser.add_argument('--dataset', choices=['SCAN','MT'],
@@ -238,7 +239,7 @@ def main(args):
             experiment.log_metrics(metrics)
 
             # Save model weights
-            if val_error < best_val_error: # use val (not test) to decide to save
+            if args.save_all_checkpoints or val_error < best_val_error: # use val (not test) to decide to save
                 best_val_error = val_error
                 if args.checkpoint_dir is not None:
                     checkpoint_path = os.path.join(args.checkpoint_dir, experiment.get_key())
