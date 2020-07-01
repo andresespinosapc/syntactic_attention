@@ -29,7 +29,7 @@ class SymbolicOperator(nn.Module):
         self.primitive_embedding = nn.Embedding(self.in_vocab_size, self.scratch_values_dim)
 
         self.gate_linear = nn.Linear(self.scratch_keys_dim, 1)
-        self.executor_rnn_cell = nn.GRUCell(input_size=self.program_dim, hidden_size=self.scratch_keys_dim * self.n_pointers)
+        self.executor_rnn_cell = nn.GRUCell(input_size=self.program_dim + self.scratch_values_dim, hidden_size=self.scratch_keys_dim * self.n_pointers)
 
         self.scratch_history = []
 
@@ -75,7 +75,8 @@ class SymbolicOperator(nn.Module):
                 write_pointer = executor_hidden[:, 2*self.scratch_keys_dim:3*self.scratch_keys_dim]
 
                 read_value, read_attn = self.attention(read_pointer.unsqueeze(1), scratch_keys, scratch_values)
-                new_value = gate * primitive + (1 - gate) * read_value.squeeze(1)
+                read_value = read_value.squeeze(1)
+                new_value = gate * primitive + (1 - gate) * read_value
                 write_mask = F.softmax(torch.bmm(write_pointer.unsqueeze(1), scratch_keys.transpose(1, 2)), dim=-1)
 
                 write_mask_flatten = write_mask.view(batch_size * max_len, 1).unsqueeze(2)
@@ -85,7 +86,7 @@ class SymbolicOperator(nn.Module):
                 previous_values_weighted = torch.bmm(1 - write_mask_flatten, scratch_values_flatten)
                 scratch_values = (new_value_weighted + previous_values_weighted).view(batch_size, max_len, -1)
 
-                executor_hidden = self.executor_rnn_cell(program, executor_hidden)
+                executor_hidden = self.executor_rnn_cell(torch.cat([program, read_value], dim=-1), executor_hidden)
 
                 if not self.training:
                     self.scratch_history[-1].append([
