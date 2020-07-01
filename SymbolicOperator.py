@@ -29,7 +29,7 @@ class SymbolicOperator(nn.Module):
         self.primitive_embedding = nn.Embedding(self.in_vocab_size, self.actions_dim)
 
         self.gate_linear = nn.Linear(self.scratch_keys_dim, 1)
-        self.executor_rnn_cell = nn.GRUCell(input_size=1, hidden_size=self.scratch_keys_dim * self.n_pointers)
+        self.executor_rnn_cell = nn.GRUCell(input_size=self.program_dim, hidden_size=self.scratch_keys_dim * self.n_pointers)
         self.out_linear = nn.Linear(self.actions_dim, self.out_vocab_size)
 
         self.scratch_history = []
@@ -58,7 +58,7 @@ class SymbolicOperator(nn.Module):
         # Remove <SOS> token from true actions
         padded_true_actions = padded_true_actions[1:, :]
         max_len = padded_true_actions.shape[0]
-        max_program_steps = max_len
+        max_program_steps = self.max_len
 
         executor_hidden = self.init_executor_hidden(batch_size)
         scratch_keys = self.scratch_keys[:max_len, :].expand(batch_size, max_len, self.scratch_keys_dim)
@@ -86,7 +86,7 @@ class SymbolicOperator(nn.Module):
                 previous_values_weighted = torch.bmm(1 - write_mask_flatten, scratch_values_flatten)
                 scratch_values = (new_value_weighted + previous_values_weighted).view(batch_size, max_len, -1)
 
-                executor_hidden = self.executor_rnn_cell(torch.zeros(batch_size, 1).to(self.device), executor_hidden)
+                executor_hidden = self.executor_rnn_cell(program, executor_hidden)
 
                 if not self.training:
                     self.scratch_history[-1].append([
