@@ -8,7 +8,7 @@ from Attention import Attention
 
 
 class SymbolicOperator(nn.Module):
-    def __init__(self, in_vocab_size, out_vocab_size):
+    def __init__(self, in_vocab_size, out_vocab_size, eos_idx):
         super().__init__()
 
         self.in_vocab_size = in_vocab_size
@@ -22,7 +22,7 @@ class SymbolicOperator(nn.Module):
 
         scratch_keys = PositionalEncoding(self.scratch_keys_dim, max_len=self.max_len).pe[:, 0, :]
         self.register_buffer('scratch_keys', scratch_keys)
-        self.initial_scratch_value = nn.Parameter(torch.randn(self.scratch_values_dim))
+        self.initial_scratch_value = nn.Parameter(torch.zeros(self.scratch_values_dim).scatter_(0, torch.tensor([eos_idx]), 1), requires_grad=False)
         self.attention = Attention()
         self.gate_embedding = nn.Embedding(self.in_vocab_size, 1)
         self.program_embedding = nn.Embedding(self.in_vocab_size, self.program_dim)

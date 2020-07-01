@@ -160,7 +160,7 @@ def main(args):
                             args.dropout_p, args.seq_sem, args.syn_act,
                             args.sem_mlp, None, device)
     elif args.model == 'symbolic_operator':
-        model = SymbolicOperator(in_vocab_size, out_vocab_size)
+        model = SymbolicOperator(in_vocab_size, out_vocab_size, eos_idx=vocab['out_token_to_idx']['<EOS>'])
     else:
         raise ValueError('Invalid model name %s' % (args.model))
 
