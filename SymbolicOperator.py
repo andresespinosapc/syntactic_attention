@@ -16,21 +16,20 @@ class SymbolicOperator(nn.Module):
         self.max_len = 50
         self.actions_dim = 200
         self.scratch_keys_dim = 128
-        self.scratch_values_dim = self.actions_dim
+        self.scratch_values_dim = self.out_vocab_size
         self.program_dim = 200
         self.n_pointers = 3
 
         scratch_keys = PositionalEncoding(self.scratch_keys_dim, max_len=self.max_len).pe[:, 0, :]
         self.register_buffer('scratch_keys', scratch_keys)
-        self.initial_scratch_value = nn.Parameter(torch.randn(self.actions_dim))
+        self.initial_scratch_value = nn.Parameter(torch.randn(self.scratch_values_dim))
         self.attention = Attention()
         self.gate_embedding = nn.Embedding(self.in_vocab_size, 1)
         self.program_embedding = nn.Embedding(self.in_vocab_size, self.program_dim)
-        self.primitive_embedding = nn.Embedding(self.in_vocab_size, self.actions_dim)
+        self.primitive_embedding = nn.Embedding(self.in_vocab_size, self.scratch_values_dim)
 
         self.gate_linear = nn.Linear(self.scratch_keys_dim, 1)
         self.executor_rnn_cell = nn.GRUCell(input_size=self.program_dim, hidden_size=self.scratch_keys_dim * self.n_pointers)
-        self.out_linear = nn.Linear(self.actions_dim, self.out_vocab_size)
 
         self.scratch_history = []
 
@@ -93,10 +92,10 @@ class SymbolicOperator(nn.Module):
                         torch.round(gate),
                         torch.round(read_attn),
                         torch.round(write_mask),
-                        self.out_linear(scratch_values).cpu().detach()
+                        scratch_values.cpu().detach()
                     ])
 
-        actions = F.log_softmax(self.out_linear(scratch_values), dim=-1)
+        actions = F.log_softmax(scratch_values, dim=-1)
 
         # Prepare decoder outputs and actions for NLLLoss (ignore -100)
         actions = actions.transpose(1, 2)
