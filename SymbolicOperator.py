@@ -14,6 +14,7 @@ class SymbolicOperator(nn.Module):
         self.in_vocab_size = in_vocab_size
         self.out_vocab_size = out_vocab_size
         self.max_len = 50
+        self.max_program_steps = 3
         self.actions_dim = 200
         self.scratch_keys_dim = 128
         self.scratch_values_dim = self.out_vocab_size
@@ -57,7 +58,7 @@ class SymbolicOperator(nn.Module):
         # Remove <SOS> token from true actions
         padded_true_actions = padded_true_actions[1:, :]
         max_len = padded_true_actions.shape[0]
-        max_program_steps = self.max_len
+        max_program_steps = self.max_program_steps
 
         executor_hidden = self.init_executor_hidden(batch_size)
         scratch_keys = self.scratch_keys[:max_len, :].expand(batch_size, max_len, self.scratch_keys_dim)
