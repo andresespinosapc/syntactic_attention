@@ -4,7 +4,8 @@ import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 
 from PositionalEncoding import PositionalEncoding
-from Attention import Attention
+from modules.attention import Attention
+from modules.attention_activation import AttentionActivation
 
 
 class SymbolicOperator(nn.Module):
@@ -24,7 +25,16 @@ class SymbolicOperator(nn.Module):
         scratch_keys = PositionalEncoding(self.scratch_keys_dim, max_len=self.max_len).pe[:, 0, :]
         self.register_buffer('scratch_keys', scratch_keys)
         self.initial_scratch_value = nn.Parameter(torch.zeros(self.scratch_values_dim).scatter_(0, torch.tensor([eos_idx]), 1), requires_grad=False)
-        self.attention = Attention()
+        self.attention_activation = AttentionActivation(
+            sample_train='gumbel_st',
+            sample_infer='argmax',
+            initial_temperature=1.,
+        )
+        self.attention = Attention(
+            input_dim=self.scratch_keys_dim,
+            method='dot',
+            attention_activation=self.attention_activation,
+        )
         self.gate_embedding = nn.Embedding(self.in_vocab_size, 1)
         self.program_embedding = nn.Embedding(self.in_vocab_size, self.program_dim)
         self.primitive_embedding = nn.Embedding(self.in_vocab_size, self.scratch_values_dim)
@@ -78,7 +88,12 @@ class SymbolicOperator(nn.Module):
                 read_value, read_attn = self.attention(read_pointer.unsqueeze(1), scratch_keys, scratch_values)
                 read_value = read_value.squeeze(1)
                 new_value = gate * primitive + (1 - gate) * read_value
-                write_mask = F.softmax(torch.bmm(write_pointer.unsqueeze(1), scratch_keys.transpose(1, 2)), dim=-1)
+                write_mask = torch.bmm(write_pointer.unsqueeze(1), scratch_keys.transpose(1, 2))
+                write_mask = self.attention_activation(
+                    write_mask,
+                    torch.zeros_like(write_mask, dtype=torch.bool).to(self.device),
+                    torch.zeros(batch_size, 1, self.scratch_keys_dim).to(self.device),
+                )
 
                 write_mask_flatten = write_mask.view(batch_size * max_len, 1).unsqueeze(2)
                 new_value_flatten = new_value.unsqueeze(1).expand(batch_size, max_len, self.scratch_values_dim).reshape(batch_size * max_len, -1).unsqueeze(1)
