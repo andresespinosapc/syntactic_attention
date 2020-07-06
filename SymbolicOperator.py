@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 
 from PositionalEncoding import PositionalEncoding
-from modules.attention import Attention
+from Attention import Attention
 from modules.attention_activation import AttentionActivation
 
 
@@ -26,15 +26,11 @@ class SymbolicOperator(nn.Module):
         self.register_buffer('scratch_keys', scratch_keys)
         self.initial_scratch_value = nn.Parameter(torch.zeros(self.scratch_values_dim).scatter_(0, torch.tensor([eos_idx]), 1), requires_grad=False)
         self.attention_activation = AttentionActivation(
-            sample_train='gumbel_st',
-            sample_infer='argmax',
+            sample_train='softmax',
+            sample_infer='softmax',
             initial_temperature=1.,
         )
-        self.attention = Attention(
-            input_dim=self.scratch_keys_dim,
-            method='dot',
-            attention_activation=self.attention_activation,
-        )
+        self.attention = Attention(attention_activation=self.attention_activation)
         self.gate_embedding = nn.Embedding(self.in_vocab_size, 1)
         self.program_embedding = nn.Embedding(self.in_vocab_size, self.program_dim)
         self.primitive_embedding = nn.Embedding(self.in_vocab_size, self.scratch_values_dim)
