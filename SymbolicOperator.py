@@ -31,11 +31,10 @@ class SymbolicOperator(nn.Module):
             initial_temperature=1.,
         )
         self.attention = Attention(attention_activation=self.attention_activation)
-        self.gate_embedding = nn.Embedding(self.in_vocab_size, 1)
+        self.gate_embedding = nn.Embedding(self.in_vocab_size, 2)
         self.program_embedding = nn.Embedding(self.in_vocab_size, self.program_dim)
         self.primitive_embedding = nn.Embedding(self.in_vocab_size, self.scratch_values_dim)
 
-        self.gate_linear = nn.Linear(self.scratch_keys_dim, 1)
         self.executor_rnn_cell = nn.GRUCell(input_size=self.program_dim + self.scratch_values_dim, hidden_size=self.scratch_keys_dim * self.n_pointers)
 
         self.scratch_history = []
@@ -73,7 +72,12 @@ class SymbolicOperator(nn.Module):
         for word_idx in instructions:
             if not self.training:
                 self.scratch_history.append([])
-            gate = torch.sigmoid(self.gate_embedding(word_idx))
+            gate = self.gate_embedding(word_idx).unsqueeze(1)
+            gate = self.attention_activation(
+                gate,
+                torch.zeros_like(gate, dtype=torch.bool).to(self.device),
+                torch.zeros(batch_size, 1, 2).to(self.device),
+            )
             program = self.program_embedding(word_idx)
             primitive = self.primitive_embedding(word_idx)
             for step in range(max_program_steps):
@@ -83,7 +87,7 @@ class SymbolicOperator(nn.Module):
 
                 read_value, read_attn = self.attention(read_pointer.unsqueeze(1), scratch_keys, scratch_values)
                 read_value = read_value.squeeze(1)
-                new_value = gate * primitive + (1 - gate) * read_value
+                new_value = torch.bmm(gate, torch.stack([primitive, read_value]).transpose(0, 1)).squeeze(1)
                 write_mask = torch.bmm(write_pointer.unsqueeze(1), scratch_keys.transpose(1, 2))
                 write_mask = self.attention_activation(
                     write_mask,
