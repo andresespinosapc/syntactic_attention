@@ -10,7 +10,10 @@ from modules.attention_activation import AttentionActivation
 
 class SymbolicOperator(nn.Module):
     def __init__(self, in_vocab_size, out_vocab_size, eos_idx,
-        max_program_steps=3, gate_activation='gumbel_st', max_len=50,
+        max_program_steps=3, max_len=50,
+        gate_activation_train='gumbel_st', gate_activation_eval='argmax',
+        read_activation_train='softmax', read_activation_eval='softmax',
+        write_activation_train='softmax', write_activation_eval='softmax',
     ):
         super().__init__()
 
@@ -27,25 +30,19 @@ class SymbolicOperator(nn.Module):
         scratch_keys = PositionalEncoding(self.scratch_keys_dim, max_len=self.max_len).pe[:, 0, :]
         self.register_buffer('scratch_keys', scratch_keys)
         self.initial_scratch_value = nn.Parameter(torch.zeros(self.scratch_values_dim).scatter_(0, torch.tensor([eos_idx]), 1), requires_grad=False)
-        if gate_activation == 'gumbel_st':
-            gate_sample_train = 'gumbel_st'
-            gate_sample_infer = 'argmax'
-        elif gate_activation == 'softmax':
-            gate_sample_train = 'softmax'
-            gate_sample_infer = 'softmax'
         self.gate_attention_activation = AttentionActivation(
-            sample_train=gate_sample_train,
-            sample_infer=gate_sample_infer,
+            sample_train=gate_activation_train,
+            sample_infer=gate_activation_eval,
             initial_temperature=1.,
         )
         self.read_attention_activation = AttentionActivation(
-            sample_train='softmax',
-            sample_infer='softmax',
+            sample_train=read_activation_train,
+            sample_infer=read_activation_eval,
             initial_temperature=1.,
         )
         self.write_attention_activation = AttentionActivation(
-            sample_train='softmax',
-            sample_infer='softmax',
+            sample_train=write_activation_train,
+            sample_infer=write_activation_eval,
             initial_temperature=1.,
         )
         self.read_attention = Attention(attention_activation=self.read_attention_activation)
