@@ -9,7 +9,9 @@ from modules.attention_activation import AttentionActivation
 
 
 class SymbolicOperator(nn.Module):
-    def __init__(self, in_vocab_size, out_vocab_size, eos_idx, max_program_steps=3, max_len=50):
+    def __init__(self, in_vocab_size, out_vocab_size, eos_idx,
+        max_program_steps=3, gate_activation='gumbel_st', max_len=50,
+    ):
         super().__init__()
 
         self.in_vocab_size = in_vocab_size
@@ -25,9 +27,15 @@ class SymbolicOperator(nn.Module):
         scratch_keys = PositionalEncoding(self.scratch_keys_dim, max_len=self.max_len).pe[:, 0, :]
         self.register_buffer('scratch_keys', scratch_keys)
         self.initial_scratch_value = nn.Parameter(torch.zeros(self.scratch_values_dim).scatter_(0, torch.tensor([eos_idx]), 1), requires_grad=False)
+        if gate_activation == 'gumbel_st':
+            gate_sample_train = 'gumbel_st'
+            gate_sample_infer = 'argmax'
+        elif gate_activation == 'softmax':
+            gate_sample_train = 'softmax'
+            gate_sample_infer = 'softmax'
         self.gate_attention_activation = AttentionActivation(
-            sample_train='gumbel_st',
-            sample_infer='argmax',
+            sample_train=gate_sample_train,
+            sample_infer=gate_sample_infer,
             initial_temperature=1.,
         )
         self.read_attention_activation = AttentionActivation(
