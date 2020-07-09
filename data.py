@@ -4,7 +4,9 @@ import torch
 from torch.utils.data import Dataset
 
 class ScanDataset(Dataset):
-    def __init__(self, file, vocab=None):
+    def __init__(self, file, vocab=None, out_filter_fn=None):
+        if out_filter_fn is None:
+            out_filter_fn = lambda x: True
 
         self.file = file
 
@@ -32,8 +34,9 @@ class ScanDataset(Dataset):
                     new_action.append(word)
             new_instruction.append('<EOS>')
             new_action.append('<EOS>')
-            text_instructions.append(new_instruction)
-            text_actions.append(new_action)
+            if out_filter_fn(new_action[1:-1]):
+                text_instructions.append(new_instruction)
+                text_actions.append(new_action)
         self.text_instructions = text_instructions
         self.text_actions = text_actions
 

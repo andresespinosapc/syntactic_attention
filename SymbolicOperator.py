@@ -9,12 +9,12 @@ from modules.attention_activation import AttentionActivation
 
 
 class SymbolicOperator(nn.Module):
-    def __init__(self, in_vocab_size, out_vocab_size, eos_idx, max_program_steps=3):
+    def __init__(self, in_vocab_size, out_vocab_size, eos_idx, max_program_steps=3, max_len=50):
         super().__init__()
 
         self.in_vocab_size = in_vocab_size
         self.out_vocab_size = out_vocab_size
-        self.max_len = 50
+        self.max_len = max_len
         self.max_program_steps = max_program_steps
         self.actions_dim = 200
         self.scratch_keys_dim = 128

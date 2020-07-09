@@ -48,6 +48,7 @@ parser.add_argument('--model', type=str, choices=['syntactic_attention', 'symbol
 parser.add_argument('--auto_val_split', type=str2bool, default=True)
 parser.add_argument('--save_all_checkpoints', type=str2bool, default=False)
 parser.add_argument('--max_program_steps', type=int, default=3, help="Maximum program steps for symbolic operator")
+parser.add_argument('--max_output_len', type=int, default=50, help='Maximum output length. Examples with less than this will be removed')
 
 # Data
 parser.add_argument('--dataset', choices=['SCAN','MT'],
@@ -114,6 +115,9 @@ parser.add_argument('--record_loss_every', type=int, default=400,
                     help='iters before printing and recording loss')
 
 def main(args):
+    def output_filter(action):
+        return len(action) <= args.max_output_len
+
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     # CUDA
@@ -127,17 +131,21 @@ def main(args):
     # Datasets
     if args.dataset == 'SCAN':
         if args.use_scan_augmented:
-            all_train_data = ScanAugmentedDataset(args.train_data_file,vocab)
+            all_train_data = ScanAugmentedDataset(args.train_data_file,vocab, out_filter_fn=output_filter)
         else:
-            all_train_data = ScanDataset(args.train_data_file,vocab)
+            all_train_data = ScanDataset(args.train_data_file,vocab, out_filter_fn=output_filter)
         if args.auto_val_split:
             split_id = int(0.8*len(all_train_data))
             train_data = [all_train_data[i] for i in range(split_id)]
             val_data = [all_train_data[i] for i in range(split_id,len(all_train_data))]
         else:
             train_data = all_train_data
-            val_data = ScanDataset(args.val_data_file,vocab)
-        test_data = ScanDataset(args.test_data_file,vocab)
+            val_data = ScanDataset(args.val_data_file,vocab, out_filter_fn=output_filter)
+        test_data = ScanDataset(args.test_data_file,vocab, out_filter_fn=output_filter)
+
+        print('Number of train examples:', len(train_data))
+        print('Number of validation examples:', len(val_data))
+        print('Number of test examples:', len(test_data))
     elif args.dataset == 'MT':
         train_data = MTDataset(args.train_data_file,vocab,args.flip)
         val_data = MTDataset(args.val_data_file,vocab,args.flip)
@@ -163,7 +171,8 @@ def main(args):
     elif args.model == 'symbolic_operator':
         model = SymbolicOperator(in_vocab_size, out_vocab_size,
             eos_idx=vocab['out_token_to_idx']['<EOS>'],
-            max_program_steps=args.max_program_steps)
+            max_program_steps=args.max_program_steps,
+            max_len=args.max_output_len + 2)
     else:
         raise ValueError('Invalid model name %s' % (args.model))
 
