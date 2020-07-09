@@ -48,6 +48,7 @@ parser.add_argument('--model', type=str, choices=['syntactic_attention', 'symbol
 parser.add_argument('--auto_val_split', type=str2bool, default=True)
 parser.add_argument('--save_all_checkpoints', type=str2bool, default=False)
 parser.add_argument('--max_program_steps', type=int, default=3, help="Maximum program steps for symbolic operator")
+parser.add_argument('--gate_activation', type=str, choices=['gumbel_st', 'softmax'], default='gumbel_st', help='Activation for gate of symbolic operator')
 
 # Data
 parser.add_argument('--dataset', choices=['SCAN','MT'],
@@ -163,7 +164,8 @@ def main(args):
     elif args.model == 'symbolic_operator':
         model = SymbolicOperator(in_vocab_size, out_vocab_size,
             eos_idx=vocab['out_token_to_idx']['<EOS>'],
-            max_program_steps=args.max_program_steps)
+            max_program_steps=args.max_program_steps,
+            gate_activation=args.gate_activation)
     else:
         raise ValueError('Invalid model name %s' % (args.model))
 
