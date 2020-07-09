@@ -117,7 +117,10 @@ class SymbolicOperator(nn.Module):
                 previous_values_weighted = torch.bmm(1 - write_mask_flatten, scratch_values_flatten)
                 scratch_values = (new_value_weighted + previous_values_weighted).view(batch_size, max_len, -1)
 
-                executor_hidden = self.executor_rnn_cell(program, executor_hidden)
+                executor_hidden = torch.bmm(gate, torch.stack([
+                    executor_hidden,
+                    self.executor_rnn_cell(program, executor_hidden),
+                ]).transpose(0, 1)).squeeze(1)
 
                 if not self.training:
                     self.scratch_history[-1].append([
