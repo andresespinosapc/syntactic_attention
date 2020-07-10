@@ -55,6 +55,8 @@ parser.add_argument('--read_activation_train', type=str, choices=['gumbel_st', '
 parser.add_argument('--read_activation_eval', type=str, choices=['argmax', 'softmax'], default='softmax', help='Activation for read of symbolic operator')
 parser.add_argument('--write_activation_train', type=str, choices=['gumbel_st', 'softmax'], default='softmax', help='Activation for write of symbolic operator')
 parser.add_argument('--write_activation_eval', type=str, choices=['argmax', 'softmax'], default='softmax', help='Activation for write of symbolic operator')
+parser.add_argument('--use_adaptive_steps', type=str2bool, default=False, help='Use an adaptive number of reasoning steps per word')
+parser.add_argument('--adaptive_steps_loss_weight', type=float, default=1.0, help='Weight to ponder adaptive steps loss')
 
 # Data
 parser.add_argument('--dataset', choices=['SCAN','MT'],
@@ -184,7 +186,8 @@ def main(args):
             read_activation_eval=args.read_activation_eval,
             write_activation_train=args.write_activation_train,
             write_activation_eval=args.write_activation_eval,
-            max_len=args.max_output_len + 2)
+            max_len=args.max_output_len + 2,
+            use_adaptive_steps=args.use_adaptive_steps)
     else:
         raise ValueError('Invalid model name %s' % (args.model))
 
@@ -214,10 +217,16 @@ def main(args):
             instructions = [ins.to(device) for ins in instructions]
             true_actions = [ta.to(device) for ta in true_actions]
             optimizer.zero_grad()
-            actions,padded_true_actions = model(instructions,true_actions)
+            result = model(instructions,true_actions)
+            if args.use_adaptive_steps:
+                actions, padded_true_actions, keep_going_loss = result
+            else:
+                actions, padded_true_actions = result
             # Compute NLLLoss
             true_actions = padded_true_actions.to(device)
             loss = loss_fn(actions,padded_true_actions)
+            if args.use_adaptive_steps:
+                loss += args.adaptive_steps_loss_weight * keep_going_loss.mean()
             # Backward pass
             loss.backward()
             if args.clip_norm is not None:
@@ -286,7 +295,11 @@ def check_accuracy(dataloader, model, device, args):
             out_vocab_size = model.out_vocab_size
             instructions = [ins.to(device) for ins in instructions]
             true_actions = [ta.to(device) for ta in true_actions]
-            actions,padded_true_actions = model(instructions, true_actions)
+            result = model(instructions, true_actions)
+            if args.use_adaptive_steps:
+                actions, padded_true_actions, keep_going_loss = result
+            else:
+                actions, padded_true_actions = result
 
             # Manually unpad with mask to compute accuracy
             mask = padded_true_actions == -100

@@ -14,6 +14,7 @@ class SymbolicOperator(nn.Module):
         gate_activation_train='gumbel_st', gate_activation_eval='argmax',
         read_activation_train='softmax', read_activation_eval='softmax',
         write_activation_train='softmax', write_activation_eval='softmax',
+        use_adaptive_steps=False,
     ):
         super().__init__()
 
@@ -50,6 +51,11 @@ class SymbolicOperator(nn.Module):
         self.program_embedding = nn.Embedding(self.in_vocab_size, self.program_dim)
         self.primitive_embedding = nn.Embedding(self.in_vocab_size, self.scratch_values_dim)
 
+        self.use_adaptive_steps = use_adaptive_steps
+        self.initial_keep_going_gate = nn.Parameter(torch.tensor([1]), requires_grad=False)
+        self.initial_keep_going_loss = nn.Parameter(torch.tensor([0], dtype=torch.float), requires_grad=False)
+        self.keep_going_linear = nn.Linear(self.scratch_values_dim, 1)
+
         self.executor_rnn_cell = nn.GRUCell(input_size=self.program_dim, hidden_size=self.scratch_keys_dim * self.n_pointers)
 
         self.scratch_history = []
@@ -84,6 +90,7 @@ class SymbolicOperator(nn.Module):
         scratch_keys = self.scratch_keys[:max_len, :].expand(batch_size, max_len, self.scratch_keys_dim)
         scratch_values = self.initial_scratch_value.repeat(batch_size, max_len, 1)
 
+        total_keep_going_loss = self.initial_keep_going_loss.repeat(batch_size, 1)
         for word_idx in instructions:
             if not self.training:
                 self.scratch_history.append([])
@@ -95,6 +102,8 @@ class SymbolicOperator(nn.Module):
             )
             program = self.program_embedding(word_idx)
             primitive = self.primitive_embedding(word_idx)
+            keep_going_gate = self.initial_keep_going_gate
+            cur_keep_going_loss = 0
             for step in range(max_program_steps):
                 init_pointer = executor_hidden[:, 0:self.scratch_keys_dim]
                 read_pointer = executor_hidden[:, self.scratch_keys_dim:2*self.scratch_keys_dim]
@@ -109,6 +118,16 @@ class SymbolicOperator(nn.Module):
                     torch.zeros_like(write_mask, dtype=torch.bool).to(self.device),
                     torch.zeros(batch_size, 1, self.scratch_keys_dim).to(self.device),
                 )
+
+                if self.use_adaptive_steps:
+                    keep_going_prob = torch.sigmoid(self.keep_going_linear(read_value))
+                    cur_keep_going_loss += keep_going_prob
+                    keep_going_gate = keep_going_gate * keep_going_prob
+
+                    write_mask = torch.bmm(
+                        keep_going_gate.unsqueeze(1),
+                        write_mask,
+                    )
 
                 write_mask_flatten = write_mask.view(batch_size * max_len, 1).unsqueeze(2)
                 new_value_flatten = new_value.unsqueeze(1).expand(batch_size, max_len, self.scratch_values_dim).reshape(batch_size * max_len, -1).unsqueeze(1)
@@ -125,10 +144,12 @@ class SymbolicOperator(nn.Module):
                 if not self.training:
                     self.scratch_history[-1].append([
                         torch.round(gate),
+                        torch.round(keep_going_gate),
                         torch.round(read_attn),
                         torch.round(write_mask),
                         scratch_values.cpu().detach()
                     ])
+            total_keep_going_loss += cur_keep_going_loss / max_program_steps
 
         actions = F.log_softmax(scratch_values, dim=-1)
 
@@ -137,4 +158,7 @@ class SymbolicOperator(nn.Module):
 
         padded_true_actions = padded_true_actions.permute(1, 0) # (batch, seq_len)
 
-        return actions, padded_true_actions
+        if self.use_adaptive_steps:
+            return actions, padded_true_actions, total_keep_going_loss
+        else:
+            return actions, padded_true_actions
