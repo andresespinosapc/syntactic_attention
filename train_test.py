@@ -51,6 +51,7 @@ parser.add_argument('--max_program_steps', type=int, default=3, help="Maximum pr
 parser.add_argument('--max_output_len', type=int, default=50, help='Maximum output length. Examples with less than this will be removed')
 parser.add_argument('--gate_activation_train', type=str, choices=['gumbel_st', 'softmax'], default='gumbel_st', help='Activation for gate of symbolic operator')
 parser.add_argument('--gate_activation_eval', type=str, choices=['argmax', 'softmax'], default='argmax', help='Activation for gate of symbolic operator')
+parser.add_argument('--gate_activation_temperature', type=float, default=1.0, help='Temperature for gumbel or softmax_st activations')
 parser.add_argument('--read_activation_train', type=str, choices=['gumbel_st', 'softmax'], default='softmax', help='Activation for read of symbolic operator')
 parser.add_argument('--read_activation_eval', type=str, choices=['argmax', 'softmax'], default='softmax', help='Activation for read of symbolic operator')
 parser.add_argument('--write_activation_train', type=str, choices=['gumbel_st', 'softmax'], default='softmax', help='Activation for write of symbolic operator')
@@ -182,6 +183,7 @@ def main(args):
             max_program_steps=args.max_program_steps,
             gate_activation_train=args.gate_activation_train,
             gate_activation_eval=args.gate_activation_eval,
+            gate_activation_temperature=args.gate_activation_temperature,
             read_activation_train=args.read_activation_train,
             read_activation_eval=args.read_activation_eval,
             write_activation_train=args.write_activation_train,

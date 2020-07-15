@@ -12,6 +12,7 @@ class SymbolicOperator(nn.Module):
     def __init__(self, in_vocab_size, out_vocab_size, eos_idx,
         max_program_steps=3, max_len=50,
         gate_activation_train='gumbel_st', gate_activation_eval='argmax',
+        gate_activation_temperature=1.0,
         read_activation_train='softmax', read_activation_eval='softmax',
         write_activation_train='softmax', write_activation_eval='softmax',
         use_adaptive_steps=False,
@@ -34,7 +35,7 @@ class SymbolicOperator(nn.Module):
         self.gate_attention_activation = AttentionActivation(
             sample_train=gate_activation_train,
             sample_infer=gate_activation_eval,
-            initial_temperature=1.,
+            initial_temperature=gate_activation_temperature,
         )
         self.read_attention_activation = AttentionActivation(
             sample_train=read_activation_train,
