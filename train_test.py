@@ -3,6 +3,7 @@ from comet_ml import Experiment
 import os
 import argparse
 import json
+import yaml
 import numpy as np
 
 import torch
@@ -42,6 +43,7 @@ def validate_args(parser, args):
 
 parser = argparse.ArgumentParser()
 
+parser.add_argument('--extra_config_path', type=str, default=None, help='Path to YAML file with extra config')
 parser.add_argument('--exp_name', type=str, default=None, help='Experiment name for CometML logging')
 parser.add_argument('--use_scan_augmented', type=str2bool, default=False, help='Use ScanAugmentedDataset')
 parser.add_argument('--model', type=str, choices=['syntactic_attention', 'symbolic_operator'], default='syntactic_attention')
@@ -124,6 +126,14 @@ parser.add_argument('--record_loss_every', type=int, default=400,
                     help='iters before printing and recording loss')
 
 def main(args):
+    if args.extra_config_path:
+        experiment.log_asset(args.extra_config_path)
+        yaml_config = yaml.load(open(args.extra_config_path))
+        curriculum = yaml_config['curriculum']
+    else:
+        yaml_config = None
+        curriculum = None
+
     def output_filter(action):
         return len(action) <= args.max_output_len
 
@@ -207,19 +217,32 @@ def main(args):
 
     # Training loop:
     iter = 0
+    curriculum_idx = 0
+    curriculum_iter = 1
     epoch_count = 0
     loss_data, train_errors, val_errors, test_errors = [],[],[],[]
     best_val_error = 1.1 # best validation error - for early stopping
     while iter < args.num_iters:
         epoch_count += 1
         for sample_count,sample in enumerate(train_loader):
+            if curriculum:
+                current_curriculum = curriculum[curriculum_idx]
+                if 'iterations' in current_curriculum and curriculum_iter >= current_curriculum['iterations']:
+                    curriculum_idx += 1
+                    curriculum_iter = 0
+                curriculum_iter += 1
+            else:
+                current_curriculum = None
             iter += 1
             # Forward pass
             instructions, true_actions, _, _ = sample
             instructions = [ins.to(device) for ins in instructions]
             true_actions = [ta.to(device) for ta in true_actions]
             optimizer.zero_grad()
-            result = model(instructions,true_actions)
+            if args.model == 'symbolic_operator':
+                result = model(instructions, true_actions, extra_config=current_curriculum)
+            else:
+                result = model(instructions, true_actions)
             if args.use_adaptive_steps:
                 actions, padded_true_actions, keep_going_loss = result
             else:

@@ -1,0 +1,16 @@
+curriculum:
+  - iterations: 15000
+    gate_activation_train: softmax
+    gate_activation_eval: softmax
+    gate_activation_temperature: 1.0
+    read_activation_train: softmax
+    read_activation_eval: argmax
+    write_activation_train: softmax
+    write_activation_eval: argmax
+  - gate_activation_train: softmax_st
+    gate_activation_eval: argmax
+    gate_activation_temperature: 1.0
+    read_activation_train: softmax
+    read_activation_eval: argmax
+    write_activation_train: softmax
+    write_activation_eval: argmax

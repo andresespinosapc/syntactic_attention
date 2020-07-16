@@ -25,9 +25,8 @@ class AttentionActivation(nn.Module):
         # Initialize temperature
         self.current_temperature = None
 
+        self.learn_temperature = learn_temperature
         if 'gumbel' in sample_train or sample_train == 'softmax_st':
-            self.learn_temperature = learn_temperature
-
             if learn_temperature == 'no':
                 self.temperature = torch.tensor(initial_temperature,
                                                 requires_grad=False, device=device)

@@ -68,7 +68,29 @@ class SymbolicOperator(nn.Module):
     def init_executor_hidden(self, batch_size):
         return self.scratch_keys[0].repeat(batch_size, self.n_pointers)
 
-    def forward(self, instructions, true_actions):
+    def set_extra_config(self, extra_config):
+        if 'gate_activation_train' in extra_config:
+            self.gate_attention_activation.sample_train = extra_config['gate_activation_train']
+        if 'gate_activation_eval' in extra_config:
+            self.gate_attention_activation.sample_infer = extra_config['gate_activation_eval']
+        if 'gate_activation_temperature' in extra_config:
+            new_temperature = torch.tensor(
+                extra_config['gate_activation_temperature'],
+                requires_grad=False, device=self.device)
+            self.gate_attention_activation.temperature = new_temperature
+        if 'read_activation_train' in extra_config:
+            self.read_attention_activation.sample_train = extra_config['read_activation_train']
+        if 'read_activation_train' in extra_config:
+            self.read_attention_activation.sample_infer = extra_config['read_activation_train']
+        if 'write_activation_train' in extra_config:
+            self.write_attention_activation.sample_train = extra_config['write_activation_train']
+        if 'write_activation_train' in extra_config:
+            self.write_attention_activation.sample_infer = extra_config['write_activation_train']
+
+    def forward(self, instructions, true_actions, extra_config=None):
+        if extra_config:
+            self.set_extra_config(extra_config)
+
         self.scratch_history = []
         batch_size = len(instructions)
 
