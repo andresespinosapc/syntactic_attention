@@ -125,29 +125,13 @@ parser.add_argument('--checkpoint_every', type=int, default=5,
 parser.add_argument('--record_loss_every', type=int, default=400,
                     help='iters before printing and recording loss')
 
-def main(args):
-    if args.extra_config_path:
-        experiment.log_asset(args.extra_config_path)
-        yaml_config = yaml.load(open(args.extra_config_path))
-        curriculum = yaml_config['curriculum']
-    else:
-        yaml_config = None
-        curriculum = None
+def load_dataloaders(args, vocab, max_output_len=None):
+    if max_output_len is None:
+        max_output_len = args.max_output_len
 
     def output_filter(action):
-        return len(action) <= args.max_output_len
+        return len(action) <= max_output_len
 
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
-    # CUDA
-    use_cuda = torch.cuda.is_available()
-    device = torch.device("cuda:0" if use_cuda else "cpu")
-
-    # Vocab
-    with open(args.load_vocab_json,'r') as f:
-        vocab = json.load(f)
-
-    # Datasets
     if args.dataset == 'SCAN':
         if args.use_scan_augmented:
             all_train_data = ScanAugmentedDataset(args.train_data_file,vocab, out_filter_fn=output_filter)
@@ -170,14 +154,36 @@ def main(args):
         val_data = MTDataset(args.val_data_file,vocab,args.flip)
         test_data = MTDataset(args.test_data_file,vocab,args.flip)
 
+    train_loader = DataLoader(train_data, args.batch_size,
+                              shuffle=True, collate_fn=SCAN_collate)
+    val_loader = DataLoader(val_data, args.batch_size,
+                            shuffle=True, collate_fn=SCAN_collate)
+    test_loader = DataLoader(test_data, args.batch_size,
+                             shuffle=True, collate_fn=SCAN_collate)
+
+    return train_loader, val_loader, test_loader
+
+def main(args):
+    if args.extra_config_path:
+        experiment.log_asset(args.extra_config_path)
+        yaml_config = yaml.load(open(args.extra_config_path))
+        curriculum = yaml_config['curriculum']
+    else:
+        yaml_config = None
+        curriculum = None
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    # CUDA
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda:0" if use_cuda else "cpu")
+
+    # Vocab
+    with open(args.load_vocab_json,'r') as f:
+        vocab = json.load(f)
 
     # Dataloaders
-    train_loader = DataLoader(train_data,args.batch_size,
-                              shuffle=True,collate_fn=SCAN_collate)
-    val_loader = DataLoader(val_data,args.batch_size,
-                            shuffle=True,collate_fn=SCAN_collate)
-    test_loader = DataLoader(test_data,args.batch_size,
-                             shuffle=True,collate_fn=SCAN_collate)
+    train_loader, val_loader, test_loader = load_dataloaders(args, vocab)
 
     in_vocab_size = len(vocab['in_token_to_idx'])
     out_vocab_size = len(vocab['out_idx_to_token'])
@@ -198,7 +204,7 @@ def main(args):
             read_activation_eval=args.read_activation_eval,
             write_activation_train=args.write_activation_train,
             write_activation_eval=args.write_activation_eval,
-            max_len=args.max_output_len + 2,
+            scratch_max_len=50,
             use_adaptive_steps=args.use_adaptive_steps)
     else:
         raise ValueError('Invalid model name %s' % (args.model))
@@ -219,11 +225,16 @@ def main(args):
     iter = 0
     curriculum_idx = 0
     curriculum_iter = 1
+    current_curriculum = None
     epoch_count = 0
     loss_data, train_errors, val_errors, test_errors = [],[],[],[]
     best_val_error = 1.1 # best validation error - for early stopping
     while iter < args.num_iters:
         epoch_count += 1
+
+        if current_curriculum and 'max_output_len' in current_curriculum:
+            train_loader, val_loader, test_loader = load_dataloaders(
+                args, vocab, max_output_len=current_curriculum['max_output_len'])
         for sample_count,sample in enumerate(train_loader):
             if curriculum:
                 current_curriculum = curriculum[curriculum_idx]

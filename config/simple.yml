@@ -1,0 +1,31 @@
+curriculum:
+  - iterations: 15000
+    max_output_len: 6
+  - iterations: 15000
+    max_output_len: 7
+  - iterations: 15000
+    max_output_len: 8
+  - iterations: 15000
+    max_output_len: 9
+  - iterations: 15000
+    max_output_len: 10
+  - iterations: 15000
+    max_output_len: 11
+  - iterations: 15000
+    max_output_len: 12
+  - iterations: 15000
+    max_output_len: 13
+  - iterations: 15000
+    max_output_len: 14
+  - iterations: 15000
+    max_output_len: 15
+  - iterations: 15000
+    max_output_len: 20
+  - iterations: 15000
+    max_output_len: 25
+  - iterations: 15000
+    max_output_len: 30
+  - iterations: 15000
+    max_output_len: 40
+  - iterations: 15000
+    max_output_len: 50

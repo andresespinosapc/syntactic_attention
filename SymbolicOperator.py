@@ -10,7 +10,7 @@ from modules.attention_activation import AttentionActivation
 
 class SymbolicOperator(nn.Module):
     def __init__(self, in_vocab_size, out_vocab_size, eos_idx,
-        max_program_steps=3, max_len=50,
+        max_program_steps=3, scratch_max_len=50,
         gate_activation_train='gumbel_st', gate_activation_eval='argmax',
         gate_activation_temperature=1.0,
         read_activation_train='softmax', read_activation_eval='softmax',
@@ -21,7 +21,7 @@ class SymbolicOperator(nn.Module):
 
         self.in_vocab_size = in_vocab_size
         self.out_vocab_size = out_vocab_size
-        self.max_len = max_len
+        self.scratch_max_len = scratch_max_len
         self.max_program_steps = max_program_steps
         self.actions_dim = 200
         self.scratch_keys_dim = 128
@@ -29,7 +29,7 @@ class SymbolicOperator(nn.Module):
         self.program_dim = 200
         self.n_pointers = 3
 
-        scratch_keys = PositionalEncoding(self.scratch_keys_dim, max_len=self.max_len).pe[:, 0, :]
+        scratch_keys = PositionalEncoding(self.scratch_keys_dim, max_len=self.scratch_max_len).pe[:, 0, :]
         self.register_buffer('scratch_keys', scratch_keys)
         self.initial_scratch_value = nn.Parameter(torch.zeros(self.scratch_values_dim).scatter_(0, torch.tensor([eos_idx]), 1), requires_grad=False)
         self.gate_attention_activation = AttentionActivation(
