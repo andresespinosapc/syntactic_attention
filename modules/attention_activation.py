@@ -110,6 +110,11 @@ class AttentionActivation(nn.Module):
                 attn = self.sparsemax(attn)
                 attn = attn.view(original_size)
 
+            elif self.sample_infer == 'argmax':
+                argmax = attn.argmax(dim=2, keepdim=True)
+                attn = torch.zeros_like(attn)
+                attn.scatter_(dim=2, index=argmax, value=1)
+
         # Inference mode
         else:
             if self.sample_infer == 'softmax':
