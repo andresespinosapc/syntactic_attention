@@ -53,7 +53,7 @@ class SymbolicOperator(nn.Module):
         self.primitive_embedding = nn.Embedding(self.in_vocab_size, self.scratch_values_dim)
 
         self.use_adaptive_steps = use_adaptive_steps
-        self.initial_keep_going_gate = nn.Parameter(torch.tensor([1]), requires_grad=False)
+        self.initial_keep_going_gate = nn.Parameter(torch.tensor([1], dtype=torch.float), requires_grad=False)
         self.initial_keep_going_loss = nn.Parameter(torch.tensor([0], dtype=torch.float), requires_grad=False)
         self.keep_going_linear = nn.Linear(self.scratch_values_dim, 1)
 
