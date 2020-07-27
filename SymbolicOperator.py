@@ -15,7 +15,7 @@ class SymbolicOperator(nn.Module):
         gate_activation_temperature=1.0,
         read_activation_train='softmax', read_activation_eval='softmax',
         write_activation_train='softmax', write_activation_eval='softmax',
-        use_adaptive_steps=False,
+        use_adaptive_steps=False, keep_going_input='read_value'
     ):
         super().__init__()
 
@@ -28,6 +28,7 @@ class SymbolicOperator(nn.Module):
         self.scratch_values_dim = self.out_vocab_size
         self.program_dim = 200
         self.n_pointers = 3
+        self.executor_hidden_dim = self.scratch_keys_dim * self.n_pointers
 
         scratch_keys = PositionalEncoding(self.scratch_keys_dim, max_len=self.scratch_max_len).pe[:, 0, :]
         self.register_buffer('scratch_keys', scratch_keys)
@@ -55,7 +56,14 @@ class SymbolicOperator(nn.Module):
         self.use_adaptive_steps = use_adaptive_steps
         self.initial_keep_going_gate = nn.Parameter(torch.tensor([1], dtype=torch.float), requires_grad=False)
         self.initial_keep_going_loss = nn.Parameter(torch.tensor([0], dtype=torch.float), requires_grad=False)
-        self.keep_going_linear = nn.Linear(self.scratch_values_dim, 1)
+        self.keep_going_input = keep_going_input
+        if self.keep_going_input == 'read_value':
+            keep_going_input_dim = self.scratch_values_dim
+        elif self.keep_going_input == 'executor_hidden':
+            keep_going_input_dim = self.executor_hidden_dim
+        else:
+            raise ValueError('Invalid keep_going_input: %s' % (self.keep_going_input))
+        self.keep_going_linear = nn.Linear(keep_going_input_dim, 1)
 
         self.executor_rnn_cell = nn.GRUCell(input_size=self.program_dim, hidden_size=self.scratch_keys_dim * self.n_pointers)
 
@@ -143,7 +151,11 @@ class SymbolicOperator(nn.Module):
                 )
 
                 if self.use_adaptive_steps:
-                    keep_going_prob = torch.sigmoid(self.keep_going_linear(read_value))
+                    if self.keep_going_input == 'read_value':
+                        keep_going_input = read_value
+                    elif self.keep_going_input == 'executor_hidden':
+                        keep_going_input = executor_hidden
+                    keep_going_prob = torch.sigmoid(self.keep_going_linear(keep_going_input))
                     cur_keep_going_loss += keep_going_prob
                     keep_going_gate = keep_going_gate * keep_going_prob
 
