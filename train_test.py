@@ -227,7 +227,8 @@ def main(args):
     curriculum_iter = 1
     current_curriculum = None
     epoch_count = 0
-    loss_data, train_errors, val_errors, test_errors = [],[],[],[]
+    losses, base_losses, adaptive_steps_losses = [], [], []
+    train_errors, val_errors, test_errors = [], [], []
     best_val_error = 1.1 # best validation error - for early stopping
     while iter < args.num_iters:
         epoch_count += 1
@@ -260,9 +261,11 @@ def main(args):
                 actions, padded_true_actions = result
             # Compute NLLLoss
             true_actions = padded_true_actions.to(device)
-            loss = loss_fn(actions,padded_true_actions)
+            base_loss = loss_fn(actions,padded_true_actions)
+            adaptive_steps_loss = torch.tensor([0], dtype=torch.float, device=device)
             if args.use_adaptive_steps:
-                loss += args.adaptive_steps_loss_weight * keep_going_loss.mean()
+                adaptive_steps_loss = args.adaptive_steps_loss_weight * keep_going_loss.mean()
+            loss = base_loss + adaptive_steps_loss
             # Backward pass
             loss.backward()
             if args.clip_norm is not None:
@@ -274,7 +277,9 @@ def main(args):
                 print('Epoch:', epoch_count,
                       'Iter:', iter,
                       'Loss:', loss_datapoint)
-                loss_data.append(loss_datapoint)
+                losses.append(loss_datapoint)
+                base_losses.append(base_loss.item())
+                adaptive_steps_losses.append(adaptive_steps_loss.item())
         # Checkpoint
         last_epoch = (iter >= args.num_iters)
         if epoch_count % args.checkpoint_every == 0 or last_epoch:
@@ -295,7 +300,7 @@ def main(args):
             results_path = os.path.join(args.results_dir, experiment.get_key())
             if not os.path.isdir(results_path):
                 os.mkdir(results_path)
-            stats = {'loss_data':loss_data,
+            stats = {'loss_data':losses,
                      'train_errors':train_errors,
                      'val_errors':val_errors,
                      'test_errors':test_errors}
@@ -306,6 +311,9 @@ def main(args):
             # Log metrics to comet
             metrics = {
                 'epoch': epoch_count,
+                'loss': np.mean(losses),
+                'base_loss': np.mean(base_losses),
+                'adaptive_steps_loss': np.mean(adaptive_steps_losses),
                 'train_seq_acc': 1.0 - train_error,
                 'val_seq_acc': 1.0 - val_error,
                 'test_seq_acc': 1.0 - test_error
