@@ -61,6 +61,8 @@ class SymbolicOperator(nn.Module):
             keep_going_input_dim = self.scratch_values_dim
         elif self.keep_going_input == 'executor_hidden':
             keep_going_input_dim = self.executor_hidden_dim
+        elif self.keep_going_input == 'read_value+executor_hidden':
+            keep_going_input_dim = self.scratch_values_dim + self.executor_hidden_dim
         else:
             raise ValueError('Invalid keep_going_input: %s' % (self.keep_going_input))
         self.keep_going_linear = nn.Linear(keep_going_input_dim, 1)
@@ -155,6 +157,8 @@ class SymbolicOperator(nn.Module):
                         keep_going_input = read_value
                     elif self.keep_going_input == 'executor_hidden':
                         keep_going_input = executor_hidden
+                    elif self.keep_going_input == 'read_value+executor_hidden':
+                        keep_going_input = torch.cat([read_value, executor_hidden], dim=-1)
                     keep_going_prob = torch.sigmoid(self.keep_going_linear(keep_going_input))
                     cur_keep_going_loss += keep_going_prob
                     keep_going_gate = keep_going_gate * keep_going_prob
