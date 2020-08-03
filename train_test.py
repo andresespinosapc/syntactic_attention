@@ -135,17 +135,17 @@ def load_dataloaders(args, vocab, max_output_len=None):
 
     if args.dataset == 'SCAN':
         if args.use_scan_augmented:
-            all_train_data = ScanAugmentedDataset(args.train_data_file,vocab, out_filter_fn=output_filter)
+            all_train_data = ScanAugmentedDataset(args.train_data_file, vocab, out_filter_fn=output_filter)
         else:
-            all_train_data = ScanDataset(args.train_data_file,vocab, out_filter_fn=output_filter)
+            all_train_data = ScanDataset(args.train_data_file, vocab, out_filter_fn=output_filter)
         if args.auto_val_split:
             split_id = int(0.8*len(all_train_data))
             train_data = [all_train_data[i] for i in range(split_id)]
             val_data = [all_train_data[i] for i in range(split_id,len(all_train_data))]
         else:
             train_data = all_train_data
-            val_data = ScanDataset(args.val_data_file,vocab, out_filter_fn=output_filter)
-        test_data = ScanDataset(args.test_data_file,vocab, out_filter_fn=output_filter)
+            val_data = ScanDataset(args.val_data_file, vocab, out_filter_fn=output_filter)
+        test_data = ScanDataset(args.test_data_file, vocab)
 
         print('Number of train examples:', len(train_data))
         print('Number of validation examples:', len(val_data))
