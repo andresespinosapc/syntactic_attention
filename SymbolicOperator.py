@@ -11,6 +11,7 @@ from modules.attention_activation import AttentionActivation
 class SymbolicOperator(nn.Module):
     def __init__(self, in_vocab_size, out_vocab_size, eos_idx,
         max_program_steps=3, scratch_max_len=50,
+        pretrained_gate=None,
         gate_activation_train='gumbel_st', gate_activation_eval='argmax',
         gate_activation_temperature=1.0,
         read_activation_train='softmax', read_activation_eval='softmax',
@@ -49,7 +50,11 @@ class SymbolicOperator(nn.Module):
             initial_temperature=1.,
         )
         self.read_attention = Attention(attention_activation=self.read_attention_activation)
-        self.gate_embedding = nn.Embedding(self.in_vocab_size, 2)
+        self.pretrained_gate = pretrained_gate
+        if self.pretrained_gate is not None:
+            self.gate_embedding = nn.Embedding.from_pretrained(self.pretrained_gate, freeze=True)
+        else:
+            self.gate_embedding = nn.Embedding(self.in_vocab_size, 2)
         self.program_embedding = nn.Embedding(self.in_vocab_size, self.program_dim)
         self.primitive_embedding = nn.Embedding(self.in_vocab_size, self.scratch_values_dim)
 
@@ -128,11 +133,12 @@ class SymbolicOperator(nn.Module):
             if not self.training:
                 self.scratch_history.append([])
             gate = self.gate_embedding(word_idx).unsqueeze(1)
-            gate = self.gate_attention_activation(
-                gate,
-                torch.zeros_like(gate, dtype=torch.bool).to(self.device),
-                torch.zeros(batch_size, 1, 2).to(self.device),
-            )
+            if self.pretrained_gate is None:
+                gate = self.gate_attention_activation(
+                    gate,
+                    torch.zeros_like(gate, dtype=torch.bool).to(self.device),
+                    torch.zeros(batch_size, 1, 2).to(self.device),
+                )
             program = self.program_embedding(word_idx)
             primitive = self.primitive_embedding(word_idx)
             keep_going_gate = self.initial_keep_going_gate

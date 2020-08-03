@@ -51,6 +51,7 @@ parser.add_argument('--auto_val_split', type=str2bool, default=True)
 parser.add_argument('--save_all_checkpoints', type=str2bool, default=False)
 parser.add_argument('--max_program_steps', type=int, default=3, help="Maximum program steps for symbolic operator")
 parser.add_argument('--max_output_len', type=int, default=50, help='Maximum output length. Examples with less than this will be removed')
+parser.add_argument('--fixed_gate', type=str2bool, default=False, help='Use fixed gate depending on primitives and operators')
 parser.add_argument('--gate_activation_train', type=str, choices=['gumbel_st', 'softmax', 'argmax', 'softmax_st'], default='gumbel_st', help='Activation for gate of symbolic operator')
 parser.add_argument('--gate_activation_eval', type=str, choices=['argmax', 'softmax'], default='argmax', help='Activation for gate of symbolic operator')
 parser.add_argument('--gate_activation_temperature', type=float, default=1.0, help='Temperature for gumbel or softmax_st activations')
@@ -126,6 +127,27 @@ parser.add_argument('--checkpoint_every', type=int, default=5,
 parser.add_argument('--record_loss_every', type=int, default=400,
                     help='iters before printing and recording loss')
 
+PRIMITIVES = [
+    'jump', 'right', 'thrice', 'run', 'left', 'walk', 'look',
+]
+OPERATORS = [
+    'opposite', 'twice', 'and', 'thrice', 'around', 'after',
+    'turn', '<SOS>', '<EOS>', '<NULL>',
+]
+
+def get_pretrained_gate(vocab):
+    pretrained_gate = []
+    for i in range(len(vocab['in_idx_to_token'])):
+        token = vocab['in_idx_to_token'][str(i)]
+        if token in PRIMITIVES:
+            pretrained_gate.append([1, 0])
+        elif token in OPERATORS:
+            pretrained_gate.append([0, 1])
+        else:
+            raise ValueError('Invalid token', token)
+
+    return torch.tensor(pretrained_gate, dtype=torch.float)
+
 def load_dataloaders(args, vocab, max_output_len=None):
     if max_output_len is None:
         max_output_len = args.max_output_len
@@ -195,9 +217,14 @@ def main(args):
                             args.dropout_p, args.seq_sem, args.syn_act,
                             args.sem_mlp, None, device)
     elif args.model == 'symbolic_operator':
+        if args.fixed_gate:
+            pretrained_gate = get_pretrained_gate(vocab)
+        else:
+            pretrained_gate = None
         model = SymbolicOperator(in_vocab_size, out_vocab_size,
             eos_idx=vocab['out_token_to_idx']['<EOS>'],
             max_program_steps=args.max_program_steps,
+            pretrained_gate=pretrained_gate,
             gate_activation_train=args.gate_activation_train,
             gate_activation_eval=args.gate_activation_eval,
             gate_activation_temperature=args.gate_activation_temperature,
