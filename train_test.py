@@ -238,24 +238,29 @@ def main(args):
     else:
         raise ValueError('Invalid model name %s' % (args.model))
 
-    if args.load_weights_from is not None:
-        model.load_state_dict(torch.load(args.load_weights_from))
     model.to(device)
-
-    # Loss function
-    loss_fn = nn.NLLLoss(reduction='mean',ignore_index=-100)
-    loss_fn = loss_fn.to(device)
 
     # Optimizer
     params = model.parameters()
     optimizer = optim.Adam(params, lr=args.learning_rate)
+
+    if args.load_weights_from is not None:
+        checkpoint = torch.load(args.load_weights_from)
+        epoch_count = checkpoint['epoch']
+        model.load_state_dict(checkpoint['model'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+    else:
+        epoch_count = 0
+
+    # Loss function
+    loss_fn = nn.NLLLoss(reduction='mean',ignore_index=-100)
+    loss_fn = loss_fn.to(device)
 
     # Training loop:
     iter = 0
     curriculum_idx = 0
     curriculum_iter = 1
     current_curriculum = None
-    epoch_count = 0
     losses, base_losses, adaptive_steps_losses = [], [], []
     train_errors, val_errors, test_errors = [], [], []
     best_val_error = 1.1 # best validation error - for early stopping
@@ -354,8 +359,12 @@ def main(args):
                 best_val_error = val_error
                 if args.checkpoint_dir is not None:
                     checkpoint_path = os.path.join(args.checkpoint_dir, experiment.get_key())
-                    torch.save(model.state_dict(),
-                               checkpoint_path)
+                    checkpoint = {
+                        'epoch': epoch_count,
+                        'model': model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                    }
+                    torch.save(checkpoint, checkpoint_path)
 
 
 def check_accuracy(dataloader, model, device, args):
