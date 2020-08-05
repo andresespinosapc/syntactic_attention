@@ -60,6 +60,7 @@ parser.add_argument('--read_activation_eval', type=str, choices=['argmax', 'soft
 parser.add_argument('--write_activation_train', type=str, choices=['gumbel_st', 'softmax'], default='softmax', help='Activation for write of symbolic operator')
 parser.add_argument('--write_activation_eval', type=str, choices=['argmax', 'softmax'], default='softmax', help='Activation for write of symbolic operator')
 parser.add_argument('--use_adaptive_steps', type=str2bool, default=False, help='Use an adaptive number of reasoning steps per word')
+parser.add_argument('--normalize_act_by_input', type=str2bool, default=False, help='Normalize adaptive steps loss by input length')
 parser.add_argument('--adaptive_steps_loss_weight', type=float, default=1.0, help='Weight to ponder adaptive steps loss')
 parser.add_argument('--keep_going_input', type=str, choices=['read_value', 'executor_hidden', 'read_value+executor_hidden'], default='read_value', help='Weight to ponder adaptive steps loss')
 
@@ -234,7 +235,8 @@ def main(args):
             write_activation_eval=args.write_activation_eval,
             scratch_max_len=50,
             use_adaptive_steps=args.use_adaptive_steps,
-            keep_going_input=args.keep_going_input)
+            keep_going_input=args.keep_going_input,
+            normalize_act_by_input=args.normalize_act_by_input)
     else:
         raise ValueError('Invalid model name %s' % (args.model))
 

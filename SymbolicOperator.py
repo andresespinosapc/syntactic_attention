@@ -16,7 +16,8 @@ class SymbolicOperator(nn.Module):
         gate_activation_temperature=1.0,
         read_activation_train='softmax', read_activation_eval='softmax',
         write_activation_train='softmax', write_activation_eval='softmax',
-        use_adaptive_steps=False, keep_going_input='read_value'
+        use_adaptive_steps=False, keep_going_input='read_value',
+        normalize_act_by_input=False,
     ):
         super().__init__()
 
@@ -59,6 +60,7 @@ class SymbolicOperator(nn.Module):
         self.primitive_embedding = nn.Embedding(self.in_vocab_size, self.scratch_values_dim)
 
         self.use_adaptive_steps = use_adaptive_steps
+        self.normalize_act_by_input = normalize_act_by_input
         self.initial_keep_going_gate = nn.Parameter(torch.tensor([1], dtype=torch.float), requires_grad=False)
         self.initial_keep_going_loss = nn.Parameter(torch.tensor([0], dtype=torch.float), requires_grad=False)
         self.keep_going_input = keep_going_input
@@ -195,6 +197,8 @@ class SymbolicOperator(nn.Module):
                         scratch_values.cpu().detach()
                     ])
             total_keep_going_loss += cur_keep_going_loss / max_program_steps
+        if self.normalize_act_by_input:
+            total_keep_going_loss /= len(instructions)
 
         actions = F.log_softmax(scratch_values, dim=-1)
 
