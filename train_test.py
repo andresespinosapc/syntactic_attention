@@ -48,7 +48,6 @@ parser.add_argument('--exp_name', type=str, default=None, help='Experiment name 
 parser.add_argument('--use_scan_augmented', type=str2bool, default=False, help='Use ScanAugmentedDataset')
 parser.add_argument('--model', type=str, choices=['syntactic_attention', 'symbolic_operator'], default='syntactic_attention')
 parser.add_argument('--auto_val_split', type=str2bool, default=True)
-parser.add_argument('--save_all_checkpoints', type=str2bool, default=False)
 parser.add_argument('--max_program_steps', type=int, default=3, help="Maximum program steps for symbolic operator")
 parser.add_argument('--max_output_len', type=int, default=50, help='Maximum output length. Examples with less than this will be removed')
 parser.add_argument('--fixed_gate', type=str2bool, default=False, help='Use fixed gate depending on primitives and operators')
@@ -123,8 +122,10 @@ parser.add_argument('--out_data_file', default='results.json',
                     help='Name of output data file')
 parser.add_argument('--checkpoint_dir',default=None,
                     help='Path to output saved weights.')
+parser.add_argument('--evaluate_every', type=int, default=1,
+                    help='Epochs before evaluating model')
 parser.add_argument('--checkpoint_every', type=int, default=5,
-                    help='Epochs before evaluating model and saving weights')
+                    help='Epochs before saving weights')
 parser.add_argument('--record_loss_every', type=int, default=400,
                     help='iters before printing and recording loss')
 
@@ -318,7 +319,7 @@ def main(args):
                 adaptive_steps_losses.append(adaptive_steps_loss.item())
         # Checkpoint
         last_epoch = (iter >= args.num_iters)
-        if epoch_count % args.checkpoint_every == 0 or last_epoch:
+        if epoch_count % args.evaluate_every == 0 or last_epoch:
             print("Checking training error...")
             train_error = check_accuracy(train_loader, model, device, args)
             print("Training error is ", train_error)
@@ -357,10 +358,14 @@ def main(args):
             experiment.log_metrics(metrics)
 
             # Save model weights
-            if args.save_all_checkpoints or val_error < best_val_error: # use val (not test) to decide to save
+            # use val (not test) to decide to save
+            if epoch_count % args.checkpoint_every == 0 or val_error < best_val_error:
                 best_val_error = val_error
                 if args.checkpoint_dir is not None:
-                    checkpoint_path = os.path.join(args.checkpoint_dir, experiment.get_key())
+                    checkpoint_dir = os.path.join(args.checkpoint_dir, experiment.get_key())
+                    checkpoint_path = os.path.join(checkpoint_dir, str(epoch_count))
+                    if not os.path.exists(checkpoint_dir):
+                        os.makedirs(checkpoint_dir)
                     checkpoint = {
                         'epoch': epoch_count,
                         'model': model.state_dict(),
