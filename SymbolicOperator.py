@@ -18,8 +18,11 @@ class SymbolicOperator(nn.Module):
         write_activation_train='softmax', write_activation_eval='softmax',
         use_adaptive_steps=False, keep_going_input='read_value',
         normalize_act_by_input=False,
+        separate_primitive_keep_going=False,
     ):
         super().__init__()
+
+        self.separate_primitive_keep_going = separate_primitive_keep_going
 
         self.in_vocab_size = in_vocab_size
         self.out_vocab_size = out_vocab_size
@@ -169,7 +172,19 @@ class SymbolicOperator(nn.Module):
                         keep_going_input = torch.cat([read_value, executor_hidden], dim=-1)
                     keep_going_prob = torch.sigmoid(self.keep_going_linear(keep_going_input))
                     cur_keep_going_loss += keep_going_prob
-                    keep_going_gate = keep_going_gate * keep_going_prob
+                    operator_keep_going_gate = keep_going_gate * keep_going_prob
+                    if self.separate_primitive_keep_going:
+                        primitive_keep_going_gate = torch.ones_like(
+                            operator_keep_going_gate,
+                            dtype=torch.float,
+                            device=self.device
+                        )
+                        keep_going_gate = torch.bmm(gate, torch.stack([
+                            primitive_keep_going_gate,
+                            operator_keep_going_gate
+                        ]).transpose(0, 1)).squeeze(1)
+                    else:
+                        keep_going_gate = operator_keep_going_gate
 
                     write_mask = torch.bmm(
                         keep_going_gate.unsqueeze(1),
