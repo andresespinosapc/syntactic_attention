@@ -220,10 +220,10 @@ class SymbolicOperator(nn.Module):
 
                 if not self.training:
                     self.scratch_history[-1].append([
-                        torch.round(gate),
-                        torch.round(keep_going_gate),
-                        torch.round(read_attn),
-                        torch.round(write_mask),
+                        gate,
+                        keep_going_gate,
+                        read_attn,
+                        write_mask,
                         scratch_values.cpu().detach()
                     ])
             total_keep_going_loss += cur_keep_going_loss / max_program_steps
