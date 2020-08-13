@@ -63,6 +63,7 @@ parser.add_argument('--normalize_act_by_input', type=str2bool, default=False, he
 parser.add_argument('--adaptive_steps_loss_weight', type=float, default=1.0, help='Weight to ponder adaptive steps loss')
 parser.add_argument('--keep_going_input', type=str, choices=['read_value', 'executor_hidden', 'read_value+executor_hidden'], default='read_value', help='Weight to ponder adaptive steps loss')
 parser.add_argument('--separate_primitive_keep_going', type=str2bool, default=False, help='Don\'t use keep going gate for primitives')
+parser.add_argument('--include_init_pointer', type=str2bool, default=True, help='Include an extra pointer that is not used for anything special')
 
 # Data
 parser.add_argument('--dataset', choices=['SCAN','MT'],
@@ -239,7 +240,8 @@ def main(args):
             use_adaptive_steps=args.use_adaptive_steps,
             keep_going_input=args.keep_going_input,
             normalize_act_by_input=args.normalize_act_by_input,
-            separate_primitive_keep_going=args.separate_primitive_keep_going)
+            separate_primitive_keep_going=args.separate_primitive_keep_going,
+            include_init_pointer=args.include_init_pointer)
     else:
         raise ValueError('Invalid model name %s' % (args.model))
 

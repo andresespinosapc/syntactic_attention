@@ -19,10 +19,12 @@ class SymbolicOperator(nn.Module):
         use_adaptive_steps=False, keep_going_input='read_value',
         normalize_act_by_input=False,
         separate_primitive_keep_going=False,
+        include_init_pointer=True,
     ):
         super().__init__()
 
         self.separate_primitive_keep_going = separate_primitive_keep_going
+        self.include_init_pointer = include_init_pointer
 
         self.in_vocab_size = in_vocab_size
         self.out_vocab_size = out_vocab_size
@@ -32,7 +34,10 @@ class SymbolicOperator(nn.Module):
         self.scratch_keys_dim = 128
         self.scratch_values_dim = self.out_vocab_size
         self.program_dim = 200
-        self.n_pointers = 3
+        n_pointers = 2
+        if self.include_init_pointer:
+            n_pointers += 1
+        self.n_pointers = n_pointers
         self.executor_hidden_dim = self.scratch_keys_dim * self.n_pointers
 
         scratch_keys = PositionalEncoding(self.scratch_keys_dim, max_len=self.scratch_max_len).pe[:, 0, :]
@@ -149,9 +154,8 @@ class SymbolicOperator(nn.Module):
             keep_going_gate = self.initial_keep_going_gate
             cur_keep_going_loss = 0
             for step in range(max_program_steps):
-                init_pointer = executor_hidden[:, 0:self.scratch_keys_dim]
-                read_pointer = executor_hidden[:, self.scratch_keys_dim:2*self.scratch_keys_dim]
-                write_pointer = executor_hidden[:, 2*self.scratch_keys_dim:3*self.scratch_keys_dim]
+                read_pointer = executor_hidden[:, 0:self.scratch_keys_dim]
+                write_pointer = executor_hidden[:, self.scratch_keys_dim:2*self.scratch_keys_dim]
 
                 read_value, read_attn = self.read_attention(read_pointer.unsqueeze(1), scratch_keys, scratch_values)
                 read_value = read_value.squeeze(1)
