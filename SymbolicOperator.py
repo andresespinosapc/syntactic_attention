@@ -72,17 +72,22 @@ class SymbolicOperator(nn.Module):
         self.initial_keep_going_gate = nn.Parameter(torch.tensor([1], dtype=torch.float), requires_grad=False)
         self.initial_keep_going_loss = nn.Parameter(torch.tensor([0], dtype=torch.float), requires_grad=False)
         self.keep_going_input = keep_going_input
+        self.keep_going_hidden_dim = self.scratch_values_dim
+        self.initial_keep_going_hidden = nn.Parameter(torch.randn([self.keep_going_hidden_dim], dtype=torch.float))
         if self.keep_going_input == 'read_value':
             keep_going_input_dim = self.scratch_values_dim
         elif self.keep_going_input == 'executor_hidden':
             keep_going_input_dim = self.executor_hidden_dim
         elif self.keep_going_input == 'read_value+executor_hidden':
             keep_going_input_dim = self.scratch_values_dim + self.executor_hidden_dim
+        elif self.keep_going_input == 'other_hidden':
+            keep_going_input_dim = self.keep_going_hidden_dim
+            self.executor_hidden_dim += self.keep_going_hidden_dim
         else:
             raise ValueError('Invalid keep_going_input: %s' % (self.keep_going_input))
         self.keep_going_linear = nn.Linear(keep_going_input_dim, 1)
 
-        self.executor_rnn_cell = nn.GRUCell(input_size=self.program_dim, hidden_size=self.scratch_keys_dim * self.n_pointers)
+        self.executor_rnn_cell = nn.GRUCell(input_size=self.program_dim, hidden_size=self.executor_hidden_dim)
 
         self.scratch_history = []
 
@@ -91,7 +96,11 @@ class SymbolicOperator(nn.Module):
         return next(self.parameters()).device
 
     def init_executor_hidden(self, batch_size):
-        return self.scratch_keys[0].repeat(batch_size, self.n_pointers)
+        executor_hidden = self.scratch_keys[0].repeat(batch_size, self.n_pointers)
+        if self.keep_going_input == 'other_hidden':
+            executor_hidden = torch.cat([executor_hidden, self.initial_keep_going_hidden.repeat(batch_size, 1)], dim=-1)
+
+        return executor_hidden
 
     def set_extra_config(self, extra_config):
         if 'gate_activation_train' in extra_config:
@@ -174,6 +183,8 @@ class SymbolicOperator(nn.Module):
                         keep_going_input = executor_hidden
                     elif self.keep_going_input == 'read_value+executor_hidden':
                         keep_going_input = torch.cat([read_value, executor_hidden], dim=-1)
+                    elif self.keep_going_input == 'other_hidden':
+                        keep_going_input = executor_hidden[:, self.n_pointers*self.scratch_keys_dim:]
                     keep_going_prob = torch.sigmoid(self.keep_going_linear(keep_going_input))
                     cur_keep_going_loss += keep_going_prob
                     operator_keep_going_gate = keep_going_gate * keep_going_prob
